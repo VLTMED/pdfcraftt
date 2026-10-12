@@ -14,6 +14,7 @@ jni = "0.21.1"
 pdfcraft-automation = { workspace = true, default-features = false }
 pdfcraft-engine = { workspace = true }
 serde_json = { workspace = true }
+pdfcraft-platform-android = { workspace = true }
 
 # Keep unsafe code denied in this crate; only the exported JNI symbols have local exceptions.
 [lints.rust]

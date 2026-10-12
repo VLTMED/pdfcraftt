@@ -4,10 +4,10 @@ This branch is a **partial native Android port**, not a production-ready or feat
 
 ## Implemented in this increment
 
-- Android SAF input staging, password-aware document open, multiple open documents, page raster/navigation, basic text search, undo/redo, and incremental/full-save transfer through `CreateDocument`.
+- Password-aware PDF open now hands the SAF `ParcelFileDescriptor` to JNI and reads its owned descriptor into the byte representation required by the Rust engine, without an intermediate staged PDF. The bridge allocates only a root-confined private default-save target so `doc_save` without an explicit path remains usable; tool inputs remain privately staged. Also includes multiple open documents, page raster/navigation, basic text search, undo/redo, and incremental/full-save transfer through `CreateDocument`.
 - JNI access to the source Automation catalog: **153 JSON-schema tools** rendered through native Compose forms.
 - A Compose view of the source's **190 registered commands**. The source currently links **62** commands to headless tools; **128** have no direct `command_run` mapping and remain explicit implementation gaps. A tool form or visible command row is not counted as proof of feature parity.
-- Rust host bridge tests: **3 passed** as of 2026-10-12.
+- Rust host suite for the bridge, SAF adapter, and Automation: **158 tests passed**; targeted Clippy with `--no-deps` passed. A strict whole-workspace Clippy run still hits the pre-existing `manual_range_contains` lint in `crates/engine/src/camera_edges.rs:235`.
 
 ## Known gaps — do not ship as complete
 
@@ -15,7 +15,7 @@ This branch is a **partial native Android port**, not a production-ready or feat
 - The mobile command palette currently routes only a small set of native actions. Specialized mobile workflows for annotations, forms, signing, redaction, OCR, page organization, printing, recents, and other commands still need implementation and round-trip tests.
 - The 128 unlinked source commands are tracked in [`docs/android-command-coverage-ar.md`](../../docs/android-command-coverage-ar.md). Some may map to existing tools, while others require Android-specific behavior or new tested Rust APIs; no equivalence is assumed.
 - SAF save/export is chunked and avoids loading full outputs into Kotlin memory, but provider atomicity, crash recovery, complete save/reopen parity, lifecycle/process-death behavior, security integration, and Android instrumentation are not proven.
-- Strict Clippy currently reports an existing upstream `manual_range_contains` lint at `crates/engine/src/camera_edges.rs:235`; the Android APK for this expanded branch still needs a fresh CI build.
+- An earlier debug APK built successfully at commit `31384d7`; the latest SAF/default-save-target changes still need a fresh CI build and device/instrumentation testing.
 
 ## Build prerequisites
 

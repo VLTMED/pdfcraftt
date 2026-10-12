@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -141,7 +142,7 @@ private data class PdfUiState(
     val error: Boolean = false,
     val passwordRequired: Boolean = false,
     val passwordWrong: Boolean = false,
-    val stagedOpenPath: String? = null,
+    val pendingOpenUri: String? = null,
     val searchMatches: List<SearchMatch> = emptyList(),
     val searchComplete: Boolean = true,
     val searchContinuation: SearchContinuation? = null,
@@ -247,22 +248,26 @@ class MainActivity : ComponentActivity() {
     private fun handleSelectedInputs(uris: List<Uri>, request: InputRequest) {
         val workspaceId = ui.value.workspaceId
         if (workspaceId <= 0) return
+        if (request.toolName == null) {
+            val uri = uris.firstOrNull() ?: return
+            runCatching {
+                contentResolver.takePersistableUriPermission(uri, android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            openSelectedDocument(uri, "")
+            return
+        }
         ui.value = ui.value.copy(busy = true, status = "جارٍ نسخ الملف إلى مساحة PdfCraft الخاصة…", error = false)
         lifecycleScope.launch {
             try {
                 val staged = withContext(Dispatchers.IO) { uris.map(::stageUri) }
                 val paths = staged.map { it.first }
-                if (request.toolName == null) {
-                    openStagedDocument(paths.first(), "")
-                } else {
-                    val field = request.fieldName ?: return@launch
-                    ui.value = ui.value.copy(
-                        busy = false,
-                        status = "تم تجهيز ${paths.size} ملف/ملفات كمدخل للأداة.",
-                        error = false,
-                        stagedToolInput = StagedToolInput(request.toolName, field, paths),
-                    )
-                }
+                val field = request.fieldName ?: return@launch
+                ui.value = ui.value.copy(
+                    busy = false,
+                    status = "تم تجهيز ${paths.size} ملف/ملفات كمدخل للأداة.",
+                    error = false,
+                    stagedToolInput = StagedToolInput(request.toolName, field, paths),
+                )
             } catch (error: Exception) {
                 ui.value = ui.value.copy(busy = false, status = error.message ?: "تعذر استيراد الملف المحدد.", error = true)
             } catch (error: LinkageError) {
@@ -297,12 +302,17 @@ class MainActivity : ComponentActivity() {
         return relative to name
     }
 
-    private fun openStagedDocument(path: String, password: String) {
+    private fun openSelectedDocument(uri: Uri, password: String) {
         val workspaceId = ui.value.workspaceId
         ui.value = ui.value.copy(busy = true, status = "جارٍ فتح PDF وتحليل بنيته…", error = false, passwordRequired = false, passwordWrong = false)
         lifecycleScope.launch {
             try {
-                val response = withContext(Dispatchers.IO) { JSONObject(NativePdf.openDocument(workspaceId, path, password)) }
+                val response = withContext(Dispatchers.IO) {
+                    val descriptor = contentResolver.openFileDescriptor(uri, "r") ?: throw IOException("تعذر فتح الملف الذي اخترته.")
+                    descriptor.use { opened ->
+                        JSONObject(NativePdf.openDocumentDescriptor(workspaceId, opened, displayName(uri), password))
+                    }
+                }
                 if (response.optString("status") != "ok") {
                     val code = response.optString("code")
                     if (code == "needs_password" || code == "wrong_password") {
@@ -312,28 +322,38 @@ class MainActivity : ComponentActivity() {
                             error = code == "wrong_password",
                             passwordRequired = true,
                             passwordWrong = code == "wrong_password",
-                            stagedOpenPath = path,
+                            pendingOpenUri = uri.toString(),
                         )
                     } else {
-                        ui.value = ui.value.copy(busy = false, status = response.optString("message", "تعذر فتح المستند."), error = true)
+                        ui.value = ui.value.copy(
+                            busy = false,
+                            status = response.optString("message", "تعذر فتح المستند."),
+                            error = true,
+                            pendingOpenUri = null,
+                        )
                     }
                     return@launch
                 }
                 val doc = response.optJSONObject("document")
                 val openedId = doc?.optLong("doc")?.takeIf { it > 0 }
-                ui.value = ui.value.copy(busy = false, passwordRequired = false, stagedOpenPath = null, status = "تم فتح المستند.", error = false)
+                ui.value = ui.value.copy(busy = false, passwordRequired = false, pendingOpenUri = null, status = "تم فتح المستند.", error = false)
                 refreshDocuments(preferredDocumentId = openedId, render = true)
             } catch (error: Exception) {
-                ui.value = ui.value.copy(busy = false, status = error.message ?: "تعذر فتح المستند.", error = true)
-            } finally {
-                // The password string is not retained in Activity state.
+                ui.value = ui.value.copy(busy = false, status = error.message ?: "تعذر فتح المستند.", error = true, pendingOpenUri = null)
+            } catch (error: LinkageError) {
+                ui.value = ui.value.copy(
+                    busy = false,
+                    status = "تعذر الوصول إلى جسر SAF الأصلي: ${error.message ?: "native error"}",
+                    error = true,
+                    pendingOpenUri = null,
+                )
             }
         }
     }
 
     private fun submitPassword(password: String) {
-        val path = ui.value.stagedOpenPath ?: return
-        openStagedDocument(path, password)
+        val uri = ui.value.pendingOpenUri?.let { Uri.parse(it) } ?: return
+        openSelectedDocument(uri, password)
     }
 
     private fun selectDocument(documentId: Long) {
@@ -629,6 +649,7 @@ private object NativePdf {
     external fun reserveInputPath(workspaceId: Long, fileName: String): String
     external fun validateInputPath(workspaceId: Long, relativePath: String): String
     external fun openDocument(workspaceId: Long, relativePath: String, password: String): String
+    external fun openDocumentDescriptor(workspaceId: Long, descriptor: ParcelFileDescriptor, name: String, password: String): String
     external fun listDocuments(workspaceId: Long): String
     external fun toolCatalog(): String
     external fun callTool(workspaceId: Long, activeDocumentId: Long, toolName: String, argumentsJson: String): String

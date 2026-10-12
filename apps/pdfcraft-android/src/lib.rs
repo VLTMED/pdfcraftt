@@ -4,10 +4,14 @@ use jni::JNIEnv;
 use jni::objects::{JObject, JString};
 use jni::sys::{jboolean, jbyteArray, jfloat, jint, jlong, jstring};
 use serde_json::{Value, json};
+#[cfg(unix)]
+use session::open_document_descriptor;
 use session::{
     abort_transfer, begin_export_file, begin_save, call_tool, close_workspace, create_workspace, finish_save, finish_transfer, list_documents,
     open_document, read_transfer_chunk, render_page, reserve_input_path, tool_catalog, validate_input_path,
 };
+#[cfg(unix)]
+use std::os::fd::{FromRawFd, OwnedFd};
 
 fn input_string(env: &mut JNIEnv<'_>, value: &JString<'_>) -> Result<String, String> {
     env.get_string(value).map(Into::into).map_err(|error| format!("Invalid UTF-8 string input: {error}"))
@@ -53,7 +57,7 @@ pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_createWork
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_closeWorkspace(mut env: JNIEnv, _this: JObject, workspace: jlong) -> jstring {
-    let response = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| close_workspace(workspace as i64))).unwrap_or_else(|_| panic_response());
+    let response = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| close_workspace(workspace))).unwrap_or_else(|_| panic_response());
     json_result(&mut env, response)
 }
 
@@ -65,9 +69,8 @@ pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_reserveInp
     workspace: jlong,
     name: JString,
 ) -> jstring {
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        input_string(&mut env, &name).map(|name| reserve_input_path(workspace as i64, name))
-    }));
+    let result =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| input_string(&mut env, &name).map(|name| reserve_input_path(workspace, name))));
     let response = match result {
         Ok(Ok(value)) => value,
         Ok(Err(message)) => json!({"status":"error","code":"invalid_input","message":message}),
@@ -84,9 +87,8 @@ pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_validateIn
     workspace: jlong,
     path: JString,
 ) -> jstring {
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        input_string(&mut env, &path).map(|path| validate_input_path(workspace as i64, path))
-    }));
+    let result =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| input_string(&mut env, &path).map(|path| validate_input_path(workspace, path))));
     let response = match result {
         Ok(Ok(value)) => value,
         Ok(Err(message)) => json!({"status":"error","code":"invalid_input","message":message}),
@@ -107,7 +109,41 @@ pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_openDocume
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let relative_path = input_string(&mut env, &relative_path)?;
         let password = input_string(&mut env, &password)?;
-        Ok::<Value, String>(open_document(workspace as i64, relative_path, password))
+        Ok::<Value, String>(open_document(workspace, relative_path, password))
+    }));
+    let response = match result {
+        Ok(Ok(value)) => value,
+        Ok(Err(message)) => json!({"status":"error","code":"invalid_input","message":message}),
+        Err(_) => panic_response(),
+    };
+    json_result(&mut env, response)
+}
+
+#[cfg(unix)]
+#[allow(unsafe_code)]
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_openDocumentDescriptor(
+    mut env: JNIEnv,
+    _this: JObject,
+    workspace: jlong,
+    descriptor: JObject,
+    name: JString,
+    password: JString,
+) -> jstring {
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let name = input_string(&mut env, &name)?;
+        let password = input_string(&mut env, &password)?;
+        let detached_fd = env.call_method(&descriptor, "detachFd", "()I", &[]).and_then(|value| value.i()).map_err(|error| {
+            let _ = env.exception_clear();
+            format!("Could not detach the Android document descriptor: {error}")
+        })?;
+        if detached_fd < 0 {
+            return Err("Android returned an invalid document descriptor.".to_string());
+        }
+        // SAFETY: `ParcelFileDescriptor.detachFd()` transfers exclusive ownership of this valid
+        // descriptor to the caller. `OwnedFd` then closes it on every success/error path.
+        let owned_descriptor = unsafe { OwnedFd::from_raw_fd(detached_fd) };
+        Ok::<Value, String>(open_document_descriptor(workspace, name, password, owned_descriptor))
     }));
     let response = match result {
         Ok(Ok(value)) => value,
@@ -120,7 +156,7 @@ pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_openDocume
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_listDocuments(mut env: JNIEnv, _this: JObject, workspace: jlong) -> jstring {
-    let response = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| list_documents(workspace as i64))).unwrap_or_else(|_| panic_response());
+    let response = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| list_documents(workspace))).unwrap_or_else(|_| panic_response());
     json_result(&mut env, response)
 }
 
@@ -144,7 +180,7 @@ pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_callTool(
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         let name = input_string(&mut env, &name)?;
         let arguments = input_string(&mut env, &arguments)?;
-        Ok::<Value, String>(call_tool(workspace as i64, active_document as i64, name, arguments))
+        Ok::<Value, String>(call_tool(workspace, active_document, name, arguments))
     }));
     let response = match result {
         Ok(Ok(value)) => value,
@@ -164,7 +200,7 @@ pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_renderPage
     page_index: jint,
     dpi: jfloat,
 ) -> jbyteArray {
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_page(workspace as i64, document as i64, page_index, dpi)));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| render_page(workspace, document, page_index, dpi)));
     let bytes = match result {
         Ok(Ok(bytes)) => bytes,
         Ok(Err(error)) => render_error_packet(&format!("{}: {}", error.code, error.message)),
@@ -182,8 +218,8 @@ pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_beginSave(
     document: jlong,
     full: jboolean,
 ) -> jstring {
-    let response = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| begin_save(workspace as i64, document as i64, full != 0)))
-        .unwrap_or_else(|_| panic_response());
+    let response =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| begin_save(workspace, document, full != 0))).unwrap_or_else(|_| panic_response());
     json_result(&mut env, response)
 }
 
@@ -195,9 +231,8 @@ pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_beginExpor
     workspace: jlong,
     path: JString,
 ) -> jstring {
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        input_string(&mut env, &path).map(|path| begin_export_file(workspace as i64, path))
-    }));
+    let result =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| input_string(&mut env, &path).map(|path| begin_export_file(workspace, path))));
     let response = match result {
         Ok(Ok(value)) => value,
         Ok(Err(message)) => json!({"status":"error","code":"invalid_input","message":message}),
@@ -215,7 +250,7 @@ pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_readTransf
     offset: jlong,
     requested: jint,
 ) -> jbyteArray {
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| read_transfer_chunk(token as i64, offset as i64, requested)));
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| read_transfer_chunk(token, offset, requested)));
     let packet = result.unwrap_or_else(|_| {
         let mut out = Vec::from(u32::MAX.to_le_bytes());
         let message = b"native_panic: Could not read the PDF transfer buffer.";
@@ -235,19 +270,19 @@ pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_finishSave
     document: jlong,
     token: jlong,
 ) -> jstring {
-    let response = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| finish_save(workspace as i64, document as i64, token as i64)))
-        .unwrap_or_else(|_| panic_response());
+    let response =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| finish_save(workspace, document, token))).unwrap_or_else(|_| panic_response());
     json_result(&mut env, response)
 }
 
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_finishTransfer(_env: JNIEnv, _this: JObject, token: jlong) {
-    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| finish_transfer(token as i64)));
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| finish_transfer(token)));
 }
 
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_ai_storyteller_pdfcraft_android_NativePdf_abortTransfer(_env: JNIEnv, _this: JObject, token: jlong) {
-    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| abort_transfer(token as i64)));
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| abort_transfer(token)));
 }

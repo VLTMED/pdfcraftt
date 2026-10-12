@@ -144,6 +144,35 @@ impl Automation {
         &mut self.session
     }
 
+    /// Open bytes supplied by a platform document provider, such as Android SAF.
+    ///
+    /// This preserves the engine's byte-backed source model and leaves tool-driven path opening
+    /// unchanged. A newly opened document has no filesystem path until a frontend saves it.
+    pub fn open_bytes(&mut self, name: impl Into<String>, bytes: Arc<Vec<u8>>, password: Option<&str>) -> std::result::Result<DocId, String> {
+        self.open_bytes_at(name, None, bytes, password)
+    }
+
+    /// Open platform-supplied bytes and optionally associate a frontend-managed save target.
+    ///
+    /// The path is metadata for the session's default `doc_save` target; this method does not
+    /// read from it or create a staged source PDF.
+    pub fn open_bytes_at(
+        &mut self,
+        name: impl Into<String>,
+        path: Option<PathBuf>,
+        bytes: Arc<Vec<u8>>,
+        password: Option<&str>,
+    ) -> std::result::Result<DocId, String> {
+        let path = match path {
+            Some(path) => {
+                let path = path.to_string_lossy();
+                Some(self.resolve(path.as_ref(), true).map_err(|error| error.to_string())?.to_string_lossy().into_owned())
+            }
+            None => None,
+        };
+        self.session.open(name, path, bytes, password).map_err(|error| error.to_string())
+    }
+
     /// Save `bytes` that a caller writes on the session's behalf, such as `pdfcraft-cli run`
     /// saving a rendered page. With a root, it is confined like a tool's own output (a relative
     /// path resolves inside it) and written atomically. Without one, the path is written as

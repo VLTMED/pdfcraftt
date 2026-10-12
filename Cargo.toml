@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "apps/*", "xtask"]
+members = ["crates/*", "crates/platform/android", "apps/*", "xtask"]
 exclude = ["vendor"]
 default-members = ["crates/*", "apps/pdfcraft", "apps/pdfcraft-cli", "xtask"]
 
@@ -48,6 +48,7 @@ pdfcraft-engine = { path = "crates/engine", version = "0.6.0" }
 pdfcraft-platform = { path = "crates/platform", version = "0.6.0" }
 pdfcraft-ui-egui = { path = "crates/ui-egui", version = "0.6.0" }
 pdfcraft-automation = { path = "crates/automation", version = "0.6.0", default-features = false }
+pdfcraft-platform-android = { path = "crates/platform/android", version = "0.6.0" }
 
 # pdf
 hayro = "0.7.1"

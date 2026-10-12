@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::fs;
+#[cfg(unix)]
+use std::os::fd::OwnedFd;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
@@ -246,6 +248,40 @@ pub fn open_document(handle: i64, relative_path: String, password: String) -> Va
     result.unwrap_or_else(BridgeError::value)
 }
 
+#[cfg(unix)]
+pub fn open_document_descriptor(handle: i64, name: String, password: String, descriptor: OwnedFd) -> Value {
+    let result = (|| -> Result<Value, BridgeError> {
+        let (workspace_id, shared) = workspace_ref(handle)?;
+        let bytes = pdfcraft_platform_android::read_owned_fd(descriptor)
+            .map_err(|error| BridgeError::new("input_read_failed", format!("Could not read the selected SAF document: {error}")))?;
+        let mut workspace = lock(&shared);
+        let safe_name = safe_file_name(&name);
+        let file_id = workspace.next_file;
+        workspace.next_file = workspace.next_file.saturating_add(1);
+        if workspace.next_file == file_id {
+            return Err(BridgeError::new("file_limit", "No more private document save targets can be created."));
+        }
+        let folder = format!("inputs/{file_id}");
+        let save_directory = workspace.root.join(&folder);
+        fs::create_dir_all(&save_directory)
+            .map_err(|error| BridgeError::new("workspace_io", format!("Could not prepare a private default save target: {error}")))?;
+        let default_save_path = save_directory.join(&safe_name);
+        let document_id = workspace
+            .automation
+            .open_bytes_at(safe_name, Some(default_save_path), bytes, (!password.is_empty()).then_some(password.as_str()))
+            .map_err(|message| tool_error(ToolError::Failed(message)))?;
+        let listing = call_json(&mut workspace, "doc_list", &json!({}))?;
+        let document = listing
+            .get("documents")
+            .and_then(Value::as_array)
+            .and_then(|documents| documents.iter().find(|document| document.get("doc").and_then(Value::as_u64) == Some(document_id.0)))
+            .cloned()
+            .ok_or_else(|| BridgeError::new("document_missing", "The opened document was not returned by the PDF session."))?;
+        Ok(json!({"status":"ok","workspaceId":workspace_id,"document":document}))
+    })();
+    result.unwrap_or_else(BridgeError::value)
+}
+
 pub fn list_documents(handle: i64) -> Value {
     let result = (|| -> Result<Value, BridgeError> {
         let (_, shared) = workspace_ref(handle)?;
@@ -421,10 +457,10 @@ pub fn finish_save(handle: i64, document_id: i64, token: i64) -> Value {
 }
 
 pub fn finish_transfer(token: i64) {
-    if let Ok(id) = u64::try_from(token) {
-        if id > 0 {
-            lock(transfers()).remove(&id);
-        }
+    if let Ok(id) = u64::try_from(token)
+        && id > 0
+    {
+        lock(transfers()).remove(&id);
     }
 }
 

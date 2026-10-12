@@ -3618,6 +3618,7 @@ dependencies = [
  "jni 0.21.1",
  "pdfcraft-automation",
  "pdfcraft-engine",
+ "pdfcraft-platform-android",
  "serde_json",
 ]
 
@@ -3890,6 +3891,10 @@ dependencies = [
  "futures-lite",
  "zbus",
 ]
+
+[[package]]
+name = "pdfcraft-platform-android"
+version = "0.6.0"
 
 [[package]]
 name = "pdfcraft-preflight"

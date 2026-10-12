@@ -55,8 +55,8 @@ jobs:
         with:
           key: android
 
-      - name: Test Rust bridge and page renderer
-        run: cargo test --locked -p pdfcraft-android-native
+      - name: Test Rust bridge, SAF descriptor adapter, and Automation
+        run: cargo test --locked -p pdfcraft-platform-android -p pdfcraft-automation -p pdfcraft-android-native
 
       - name: Build Rust JNI libraries
         run: bash apps/pdfcraft-android/scripts/build-native.sh

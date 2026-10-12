@@ -9,11 +9,11 @@
 - كان Android قبل هذا الفرع يقتصر على فتح/تحليل/raster. الفرع الحالي أضاف مساحة Automation مستمرة، 153 نموذج أداة، حفظاً/تصديراً مجزّأً، بحثاً/undo/redo، وعارضاً أساسياً؛ تبقى واجهات متخصصة واختبارات التكافؤ غير مكتملة.
 - حالات **PdfCraft** في الجدول: `منفذ`، `جزئي`، `غير واضح`. حالات **Android**: `جزئي`، `مفقود`، `تجريبي محدود`.
 - «فجوة النقل» تعني ما يلزم لبناء binding/session/UI/SAF lifecycle، لا أنها تثبت أن التنفيذ المقترح موجود.
-- اختبارات Rust host الحالية: **3 ناجحة**. `cargo clippy -D warnings` تعثر بسبب lint موجود في `crates/engine/src/camera_edges.rs:235`، ولم يُبن APK Android الموسع على CI بعد.
+- suite Rust host المستهدفة الحالية: **158 اختباراً ناجحاً**، وClippy بـ`--no-deps` ناجح للحزم المتأثرة. Clippy الصارم الكامل يتعثر بسبب lint سابق في `crates/engine/src/camera_edges.rs:235` (`manual_range_contains`). سبق أن بنى CI APK debug للالتزام `31384d7`؛ تغييرات SAF الحالية تنتظر build حديثاً، ولم تُشغّل instrumentation أو اختبارات جهاز.
 
 ### Delta تنفيذ Android بتاريخ 2026-10-12
 
-- جسر JNI يدير Automation workspace مستمراً متعدد المستندات، مع SAF مرحلي للإدخال، فتح بكلمة مرور، rendering، وواجهات أدوات schema-driven.
+- جسر JNI يدير Automation workspace مستمراً متعدد المستندات. فتح PDF من SAF يمرر `ParcelFileDescriptor` إلى `OwnedFd` ثم يقرأه إلى `Arc<Vec<u8>>` بلا PDF مرحلي. يُسجّل فقط هدف حفظ افتراضياً تحت جذر workspace، مع فرض حدود المسار، كي تستمر `doc_save` بلا ملف PDF مصدر مكتوب. ملفات إدخال أدوات Automation ما زالت تُرحّل إلى workspace؛ المسار لم يُختبر على جهاز Android بعد.
 - عدد أدوات Automation الفعلي **153**. سجل المصدر يحتوي **190 أمراً**؛ **62** منها فقط مرتبطة بأداة عبر `tool_for_command`، و**128** بلا ربط مباشر. أضيف تبويب يعرض الأمر وحالته؛ يعالج Android حالياً مجموعة صغيرة من أوامر الفتح/الحفظ/التراجع/البحث/الوضع الواحد، ويستعمل `command_run` للأوامر المرتبطة، بينما تبقى الأوامر الأخرى غير المنفذة معلّمة.
 - هذا delta لا يثبت fidelity للعارض (صورة صفحة كاملة بلا tiling/zoom متقدم)، ولا instrumentation، lifecycle، واجهات تخصصية للتعليقات/النماذج/التوقيع/التنقيح، أو round-trip لكل أداة. تفاصيل الأوامر الـ190 في [الجرد الكامل](android-command-coverage-ar.md).
 

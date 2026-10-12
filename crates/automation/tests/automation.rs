@@ -87,6 +87,39 @@ fn page_text(a: &mut Automation, doc: u64) -> Vec<String> {
 }
 
 #[test]
+fn opens_platform_supplied_bytes_without_a_filesystem_path() {
+    let mut automation = Automation::new().with_clock(|| 1_700_000_000);
+    let document_id = automation.open_bytes("from-saf.pdf", std::sync::Arc::new(fixture(2)), None).expect("open SAF-provided document bytes");
+
+    let listing = ok(&mut automation, "doc_list", json!({}));
+    let document = listing["documents"]
+        .as_array()
+        .expect("document list")
+        .iter()
+        .find(|document| document["doc"].as_u64() == Some(document_id.0))
+        .expect("opened document summary");
+    assert_eq!(document["name"], "from-saf.pdf");
+    assert_eq!(document["pages"], 2);
+}
+
+#[test]
+fn platform_bytes_keep_the_default_doc_save_target() {
+    let dir = workdir("saf-default-save");
+    let target = dir.join("inputs/1/from-saf.pdf");
+    let mut automation = Automation::new().with_root(dir.clone()).expect("confine to the temporary workspace").with_clock(|| 1_700_000_000);
+    let outside = dir.parent().expect("temporary directory has a parent").join("outside.pdf");
+    assert!(automation.open_bytes_at("outside.pdf", Some(outside), std::sync::Arc::new(fixture(1)), None).is_err());
+    let document_id = automation
+        .open_bytes_at("from-saf.pdf", Some(target.clone()), std::sync::Arc::new(fixture(2)), None)
+        .expect("open SAF-provided bytes with a private default save target");
+
+    let saved = ok(&mut automation, "doc_save", json!({ "doc": document_id.0 }));
+    assert_eq!(saved["path"].as_str(), target.to_str());
+    assert!(target.is_file());
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn tool_table_is_well_formed() {
     let all = tools();
     let mut names = std::collections::HashSet::new();
