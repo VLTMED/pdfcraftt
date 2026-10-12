@@ -55,6 +55,9 @@ jobs:
         with:
           key: android
 
+      - name: Test the JNI bridge on the host
+        run: cargo test --locked --package pdfcraft-android-native
+
       - name: Build Rust JNI libraries
         run: bash apps/pdfcraft-android/scripts/build-native.sh
 
