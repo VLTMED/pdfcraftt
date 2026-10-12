@@ -15,7 +15,7 @@ This branch is a **partial native Android port**, not a production-ready or feat
 - The mobile command palette currently routes only a small set of native actions. Specialized mobile workflows for annotations, forms, signing, redaction, OCR, page organization, printing, recents, and other commands still need implementation and round-trip tests.
 - The 128 unlinked source commands are tracked in [`docs/android-command-coverage-ar.md`](../../docs/android-command-coverage-ar.md). Some may map to existing tools, while others require Android-specific behavior or new tested Rust APIs; no equivalence is assumed.
 - SAF save/export is chunked and avoids loading full outputs into Kotlin memory, but provider atomicity, crash recovery, complete save/reopen parity, lifecycle/process-death behavior, security integration, and Android instrumentation are not proven.
-- An earlier debug APK built successfully at commit `31384d7`; the latest SAF/default-save-target changes still need a fresh CI build and device/instrumentation testing.
+- CI built the current debug APK for commit `a8aac5f` ([workflow run](https://github.com/VLTMED/pdfcraftt/actions/runs/38209774871)); archive integrity and `arm64-v8a`/`x86_64` native libraries were verified. It has not been instrumented or run on a physical device and is not store-ready.
 
 ## Build prerequisites
 
@@ -35,4 +35,4 @@ bash apps/pdfcraft-android/scripts/build-native.sh
 gradle --no-daemon -p apps/pdfcraft-android :app:assembleDebug
 ```
 
-The APK is written to `apps/pdfcraft-android/app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions uploads a debug-signed APK as a 14-day artifact after a successful build; it is not store-ready. The earlier artifact predates the Automation/session expansion and is not a valid APK for this current increment.
+The APK is written to `apps/pdfcraft-android/app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions uploads a debug-signed APK as a 14-day artifact after a successful build; it is not store-ready. Use the linked workflow run above for the current increment; older artifacts predate the SAF descriptor/default-save-target changes.

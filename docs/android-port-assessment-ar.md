@@ -2,7 +2,7 @@
 
 **تاريخ التدقيق:** 2026-10-12
 **المصدر:** المستودع `VLTMED/pdfcraftt`، commit `84a75eae1b46d155656f10e9278373726a808fbb` (مطابق للأرشيف المرفق).
-**المنهج:** يبدأ هذا التقرير بخط أساس ساكن للمصدر عند commit المذكور، ثم أُضيف تحديث للتنفيذ في هذا الفرع. اجتازت suite المضيف المستهدفة للجسر وSAF وAutomation **158 اختباراً**، ونجح Clippy للحزم المتأثرة مع `--no-deps`. أما Clippy الصارم الكامل فما زال يصطدم بـlint سابق في `crates/engine/src/camera_edges.rs:235` (`manual_range_contains`). نجح Workflow في إنتاج APK debug للالتزام السابق `31384d7`، لكن تعديل SAF الحالي ينتظر بناء CI جديداً؛ ولا توجد اختبارات instrumentation أو جهاز فعلي.
+**المنهج:** يبدأ هذا التقرير بخط أساس ساكن للمصدر عند commit المذكور، ثم أُضيف تحديث للتنفيذ في هذا الفرع. اجتازت suite المضيف المستهدفة للجسر وSAF وAutomation **158 اختباراً**، ونجح Clippy للحزم المتأثرة مع `--no-deps`. أما Clippy الصارم الكامل فما زال يصطدم بـlint سابق في `crates/engine/src/camera_edges.rs:235` (`manual_range_contains`). نجح CI في بناء APK debug للالتزام `a8aac5f` ([التشغيل](https://github.com/VLTMED/pdfcraftt/actions/runs/38209774871))، وفُحصت سلامة الأرشيف ووجود ABIّات Android؛ لكن لا توجد اختبارات instrumentation أو تجربة على جهاز فعلي.
 
 ## الحكم التنفيذي
 

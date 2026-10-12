@@ -9,7 +9,7 @@
 - كان Android قبل هذا الفرع يقتصر على فتح/تحليل/raster. الفرع الحالي أضاف مساحة Automation مستمرة، 153 نموذج أداة، حفظاً/تصديراً مجزّأً، بحثاً/undo/redo، وعارضاً أساسياً؛ تبقى واجهات متخصصة واختبارات التكافؤ غير مكتملة.
 - حالات **PdfCraft** في الجدول: `منفذ`، `جزئي`، `غير واضح`. حالات **Android**: `جزئي`، `مفقود`، `تجريبي محدود`.
 - «فجوة النقل» تعني ما يلزم لبناء binding/session/UI/SAF lifecycle، لا أنها تثبت أن التنفيذ المقترح موجود.
-- suite Rust host المستهدفة الحالية: **158 اختباراً ناجحاً**، وClippy بـ`--no-deps` ناجح للحزم المتأثرة. Clippy الصارم الكامل يتعثر بسبب lint سابق في `crates/engine/src/camera_edges.rs:235` (`manual_range_contains`). سبق أن بنى CI APK debug للالتزام `31384d7`؛ تغييرات SAF الحالية تنتظر build حديثاً، ولم تُشغّل instrumentation أو اختبارات جهاز.
+- suite Rust host المستهدفة الحالية: **158 اختباراً ناجحاً**، وClippy بـ`--no-deps` ناجح للحزم المتأثرة. Clippy الصارم الكامل يتعثر بسبب lint سابق في `crates/engine/src/camera_edges.rs:235` (`manual_range_contains`). بنى CI APK debug للالتزام `a8aac5f` ([التشغيل](https://github.com/VLTMED/pdfcraftt/actions/runs/38209774871))، واجتاز فحص الأرشيف ووجود ABIّات native؛ لم تُشغّل instrumentation أو اختبارات جهاز.
 
 ### Delta تنفيذ Android بتاريخ 2026-10-12
 
