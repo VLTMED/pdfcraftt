@@ -1,6 +1,6 @@
 # PdfCraft Android integration prototype
 
-This is an **integration prototype**, not a complete PdfCraft Android port. It opens a document via Android's system document picker and calls the existing Rust COS/model crates through JNI to report the PDF version and page count. It does not render pages, edit or save documents, or expose the desktop feature set.
+This is an **integration prototype**, not a complete PdfCraft Android port. It opens a document via Android's system document picker, reports PDF version/page count through the COS/model crates, and uses the existing `pdfcraft-render::PageRenderer` through JNI to rasterize a page for a Compose `Bitmap` viewer with previous/next navigation. Page rendering currently reparses the source for each request at a fixed scale; there is no persistent document session, tile-based zoom, editing, saving, or full desktop feature set.
 
 The prototype intentionally labels this limitation in the UI and in the [Android feasibility assessment](../../docs/android-port-assessment-ar.md). Do not distribute it as a feature-complete or parity release.
 

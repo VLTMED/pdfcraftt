@@ -3618,6 +3618,7 @@ dependencies = [
  "jni 0.21.1",
  "pdfcraft-cos",
  "pdfcraft-model",
+ "pdfcraft-render",
 ]
 
 [[package]]
