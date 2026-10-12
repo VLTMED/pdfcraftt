@@ -1,0 +1,42 @@
+[package]
+name = "pdfcraft-android"
+description = "PdfCraft on Android (scaffold — see src/lib.rs for status and open items)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+# Loaded by the system as a shared library (GameActivity), not run as a binary.
+[lib]
+crate-type = ["cdylib"]
+
+# Not `lints.workspace = true`: this crate's FFI entry point needs `#[unsafe(no_mangle)]`
+# (Rust 2024 wraps no_mangle/export_name/link_section in `unsafe(...)`), and the Storage
+# Access Framework / PrintManager JNI bridges planned next both need `unsafe` too. The
+# workspace default is `forbid`, which no local `#[allow]` can lift, so this one crate opts
+# out to `deny` instead and keeps the rest of the workspace's lints unchanged. Every other
+# crate keeps the original `forbid` — see root Cargo.toml `[workspace.lints.rust]`.
+[lints.rust]
+unsafe_code = "deny"
+
+[lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+
+[dependencies]
+# Same shared UI shell the desktop and web apps use — zero duplication, zero feature gap by
+# construction: whatever PdfCraftApp supports there, it supports here too.
+pdfcraft-ui-egui = { workspace = true }
+# `android-game-activity`, not `android-native-activity`: pdfcraft-ui-egui's eframe already
+# enables `accesskit` (screen-reader support, matching every other platform's partial AccessKit
+# coverage per docs/hardware-parity.md), and eframe only allows `accesskit` together with
+# `android-game-activity` (see its compile-time check in lib.rs). Declared unconditionally,
+# like pdfcraft-web's eframe features: the feature is a no-op on non-Android targets, since
+# eframe itself cfg-gates the Android-specific code behind `target_os = "android"`.
+eframe = { workspace = true, features = ["android-game-activity"] }
+egui = { workspace = true }
+log = { workspace = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+android-activity = { version = "0.6.1", features = ["game-activity"] }
+android_logger = "0.15"
