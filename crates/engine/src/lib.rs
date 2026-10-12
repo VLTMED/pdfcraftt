@@ -3070,6 +3070,18 @@ impl Session {
         self.docs.iter_mut().find(|d| d.id == id).ok_or(EditError::NoDocument)
     }
 
+    /// Set the renderer's policy for whole-page requests that exceed its hard size caps.
+    /// Mobile viewers use `true` and render tiles instead of silently receiving a smaller page.
+    pub fn set_render_reject_oversize(&mut self, id: DocId, reject: bool) -> Result<(), EditError> {
+        let doc = self.doc_mut(id)?;
+        if doc.config.reject_oversize == reject {
+            return Ok(());
+        }
+        doc.config.reject_oversize = reject;
+        doc.renderer = RenderPool::new(doc.display.clone(), render_threads(), doc.config.clone());
+        Ok(())
+    }
+
     /// Apply an edit. On success the previous state is undoable and the view data is refreshed.
     pub fn apply(&mut self, id: DocId, edit: Edit) -> Result<(), EditError> {
         let now = self.now();

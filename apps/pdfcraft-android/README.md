@@ -1,8 +1,21 @@
-# PdfCraft Android integration prototype
+# PdfCraft Android port — work in progress
 
-This is an **integration prototype**, not a complete PdfCraft Android port. It opens a document via Android's system document picker, reports PDF version/page count through the COS/model crates, and uses the existing `pdfcraft-render::PageRenderer` through JNI to rasterize a page for a Compose `Bitmap` viewer with previous/next navigation. Page rendering currently reparses the source for each request at a fixed scale; there is no persistent document session, tile-based zoom, editing, saving, or full desktop feature set.
+This branch is a **partial native Android port**, not a production-ready or feature-parity release. It keeps PdfCraft's Rust parsing/editing/automation code as the engine and adds a Kotlin/Jetpack Compose shell with a persistent Rust Automation workspace through JNI.
 
-The prototype intentionally labels this limitation in the UI and in the [Android feasibility assessment](../../docs/android-port-assessment-ar.md). Do not distribute it as a feature-complete or parity release.
+## Implemented in this increment
+
+- Android SAF input staging, password-aware document open, multiple open documents, page raster/navigation, basic text search, undo/redo, and incremental/full-save transfer through `CreateDocument`.
+- JNI access to the source Automation catalog: **153 JSON-schema tools** rendered through native Compose forms.
+- A Compose view of the source's **190 registered commands**. The source currently links **62** commands to headless tools; **128** have no direct `command_run` mapping and remain explicit implementation gaps. A tool form or visible command row is not counted as proof of feature parity.
+- Rust host bridge tests: **3 passed** as of 2026-10-12.
+
+## Known gaps — do not ship as complete
+
+- The page renderer still produces a full-page bitmap at a fixed scale; tile rendering, high-resolution zoom/cache, multi-page layouts, and many accessibility interactions are not yet integrated.
+- The mobile command palette currently routes only a small set of native actions. Specialized mobile workflows for annotations, forms, signing, redaction, OCR, page organization, printing, recents, and other commands still need implementation and round-trip tests.
+- The 128 unlinked source commands are tracked in [`docs/android-command-coverage-ar.md`](../../docs/android-command-coverage-ar.md). Some may map to existing tools, while others require Android-specific behavior or new tested Rust APIs; no equivalence is assumed.
+- SAF save/export is chunked and avoids loading full outputs into Kotlin memory, but provider atomicity, crash recovery, complete save/reopen parity, lifecycle/process-death behavior, security integration, and Android instrumentation are not proven.
+- Strict Clippy currently reports an existing upstream `manual_range_contains` lint at `crates/engine/src/camera_edges.rs:235`; the Android APK for this expanded branch still needs a fresh CI build.
 
 ## Build prerequisites
 
@@ -22,4 +35,4 @@ bash apps/pdfcraft-android/scripts/build-native.sh
 gradle --no-daemon -p apps/pdfcraft-android :app:assembleDebug
 ```
 
-The APK is written to `apps/pdfcraft-android/app/build/outputs/apk/debug/app-debug.apk`. The GitHub Actions workflow builds the same APK and publishes it as a 14-day Actions artifact; it is a debug-signed artifact, not a store-ready release.
+The APK is written to `apps/pdfcraft-android/app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions uploads a debug-signed APK as a 14-day artifact after a successful build; it is not store-ready. The earlier artifact predates the Automation/session expansion and is not a valid APK for this current increment.

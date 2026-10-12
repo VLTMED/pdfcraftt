@@ -3616,9 +3616,9 @@ name = "pdfcraft-android-native"
 version = "0.6.0"
 dependencies = [
  "jni 0.21.1",
- "pdfcraft-cos",
- "pdfcraft-model",
- "pdfcraft-render",
+ "pdfcraft-automation",
+ "pdfcraft-engine",
+ "serde_json",
 ]
 
 [[package]]

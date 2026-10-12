@@ -138,6 +138,12 @@ impl Automation {
         &self.session
     }
 
+    /// Mutably access the engine session for frontends that perform a transactional platform save.
+    /// Tool calls should still go through [`Self::call`] so its renderer and text caches stay in sync.
+    pub fn session_mut(&mut self) -> &mut Session {
+        &mut self.session
+    }
+
     /// Save `bytes` that a caller writes on the session's behalf, such as `pdfcraft-cli run`
     /// saving a rendered page. With a root, it is confined like a tool's own output (a relative
     /// path resolves inside it) and written atomically. Without one, the path is written as
@@ -150,6 +156,17 @@ impl Automation {
             std::fs::write(&target, bytes).map_err(|e| failed(format!("{path}: {e}")))?;
         }
         Ok(target)
+    }
+
+    /// Read a tool output from the same confined root used for tool inputs and writes.
+    pub fn read_output(&self, path: &str) -> Result<Vec<u8>> {
+        let target = self.resolve(path, false)?;
+        std::fs::read(&target).map_err(|e| failed(format!("{}: {e}", target.display())))
+    }
+
+    /// Resolve an existing input path under the configured root without reading its contents.
+    pub fn resolve_input_path(&self, path: &str) -> Result<PathBuf> {
+        self.resolve(path, false)
     }
 
     /// Run the tool `name` with JSON `args` (an object; `null` means no arguments).
